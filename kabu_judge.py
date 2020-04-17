@@ -1,6 +1,7 @@
 import sys
 import os
 import csv
+from math import ceil, floor 
 
 # カブ価関連情報を保持するクラス
 class kabu_log:
@@ -36,39 +37,46 @@ class kabu_judge(kabu_log):
     def __init__(self,data):
         super().__init__(data)
         self.pre_price = None # 1個前の売値
-        self.rate_acc = [0.0, 0.0] # 累積した補正倍率、[0]=最低値、[1]=最高値
         self.phase = None # 変動の段階
         self.len = 0 # 変動の長さ
     
     def reset(self):
         self.pre_price = None
-        self.rate_acc = [0.0, 0.0]
         self.phase = None
         self.len = 0 # 変動の長さ
     
-    def judge_dec(self, price, baserate, rate1, rate2, length):
-        min_price = self.base * (baserate[0] + rate1 + rate2[0] + self.rate_acc[0])
-        max_price = self.base * (baserate[1] + rate1 + rate2[1] + self.rate_acc[1])
-        if((price >= min_price) and (price <= max_price) and (self.len < length[1])):
-            # 減少フェーズ継続
-            self.len += 1
-            if((self.pre_price is None) or (self.rate_acc==[0.0,0.0])):
-                self.rate_acc = rate1+rate2
+    def judge_dec(self, price, baserate, dec_rate, length):
+        if((self.pre_price is None) or (self.len == 0)):
+            min_price = ceil(self.base * baserate[0])
+            max_price = ceil(self.base * baserate[1])
+            if((price >= min_price) and (price <= max_price) and (self.len < length[1])):
+                # 減少フェーズ継続
+                self.len += 1
+            elif(self.len >= length[0]):
+                # 次フェーズに移行
+                len_tmp = self.len
+                self.len = 0
+                return True, len_tmp            
             else:
-                self.rate_acc += (price - self.pre_price) / self.base
-        elif(self.len >= length[0]):
-            # 次フェーズに移行
-            len_tmp = self.len
-            self.len = 0
-            self.rate_acc = [0.0, 0.0]
-            return True, len_tmp            
+                return False, None
         else:
-            return False, None
+            min_price = floor(self.pre_price + self.base * dec_rate[0])
+            max_price = ceil(self.pre_price + self.base * dec_rate[1])            
+            if((price >= min_price) and (price <= max_price) and (self.len < length[1])):
+                # 減少フェーズ継続
+                self.len += 1
+            elif(self.len >= length[0]):
+                # 次フェーズに移行
+                len_tmp = self.len
+                self.len = 0
+                return True, len_tmp            
+            else:
+                return False, None            
         return True, None
 
     def judge_high(self, price, baserate, length):
-        min_price = self.base * baserate[0]
-        max_price = self.base * baserate[1]
+        min_price = ceil(self.base * baserate[0])
+        max_price = ceil(self.base * baserate[1])
         if((price >= min_price) and (price <= max_price) and (self.len < length[1])):
             # 増加フェーズ継続
             self.len += 1
@@ -76,7 +84,6 @@ class kabu_judge(kabu_log):
             # 次フェーズに移行
             len_tmp = self.len
             self.len = 0
-            self.rate_acc = [0.0, 0.0]
             return True, len_tmp  
         else:
             return False, None
@@ -99,7 +106,7 @@ class kabu_judge(kabu_log):
                     hiPhaseLen2 = 7 - high[1]
                     self.phase = "decreasing1" 
             if(self.phase == "decreasing1"): # 1回目の減少フェーズ
-                dec = self.judge_dec(price=self.prices[day], baserate=[0.6,0.8], rate1=-0.04, rate2=[-0.06,0.0], length=[2,3])
+                dec = self.judge_dec(price=self.prices[day], baserate=[0.6,0.8], dec_rate=[-0.1,-0.04], length=[2,3])
                 if(not dec[0]):
                     self.types.pop("波型")
                     break
@@ -116,7 +123,7 @@ class kabu_judge(kabu_log):
                     # 減少フェーズに移行 
                     self.phase = "decreasing2"
             if(self.phase == "decreasing2"): # 2回目の減少フェーズ
-                dec = self.judge_dec(price=self.prices[day], baserate=[0.6,0.8], rate1=-0.04, rate2=[-0.06,0.0], length=[decPhaseLen2,decPhaseLen2])
+                dec = self.judge_dec(price=self.prices[day], baserate=[0.6,0.8], dec_rate=[-0.1,-0.04], length=[decPhaseLen2,decPhaseLen2])
                 if(not dec[0]):
                     self.types.pop("波型")
                     break
@@ -128,18 +135,20 @@ class kabu_judge(kabu_log):
                 if(not high[0]):
                     self.types.pop("波型")
                     break                                      
-            self.pre_price = self.prices[day]                    
+            self.pre_price = self.prices[day]
+        #print("波型："+day)                    
 
     # 減少型
     def decreasing(self):
         self.reset()
         for day in self.days:
             if(self.prices[day] == 0): break
-            dec = self.judge_dec(price=self.prices[day], baserate=[0.85,0.90], rate1=-0.03, rate2=[-0.02,0.0], length=[12,12])
+            dec = self.judge_dec(price=self.prices[day], baserate=[0.85,0.90], dec_rate=[-0.05,-0.03], length=[12,12])
             if(not dec[0]):
                 self.types.pop("減少型")
                 break
             self.pre_price = self.prices[day]
+        #print("減少型："+day)
     
     # 跳ね小型
     def smallspike(self):
@@ -148,7 +157,7 @@ class kabu_judge(kabu_log):
         for day in self.days:
             if(self.prices[day] == 0): break
             if(self.phase == "decreasing1"): # 1回目の減少フェーズ
-                dec = self.judge_dec(price=self.prices[day], baserate=[0.4,0.9], rate1=-0.03, rate2=[-0.02,0.0], length=[0,7])
+                dec = self.judge_dec(price=self.prices[day], baserate=[0.4,0.9], dec_rate=[-0.05,-0.03], length=[0,7])
                 if(not dec[0]):
                     self.types.pop("跳ね小型")
                     break
@@ -162,27 +171,27 @@ class kabu_judge(kabu_log):
                     break
                 if(high[1] is not None):
                     # 跳ね3フェーズに移行 
+                    price_spike3=self.prices[day]
                     self.phase = "spike3"
             if(self.phase == "spike3"): # 跳ね3フェーズ
-                price_spike3=self.prices[day]
                 high = self.judge_high(price=self.prices[day], baserate=[1.4,1.999], length=[1,1])
                 if(not high[0]):
                     self.types.pop("跳ね小型")
                     break
                 if(high[1] is not None):
                     # 跳ね4フェーズに移行 
+                    price_spike4=self.prices[day]
                     self.phase = "spike4"
-            if(self.phase == "spike4"): # 跳ね4フェーズ
-                price_spike4=self.prices[day]
+            if(self.phase == "spike4"): # 跳ね4フェーズ           
                 high = self.judge_high(price=self.prices[day], baserate=[1.4,2.0], length=[1,1])
                 if((not high[0]) or (price_spike4 < price_spike3)):
                     self.types.pop("跳ね小型")
                     break
                 if(high[1] is not None):
                     # 跳ね5フェーズに移行 
+                    price_spike5=self.prices[day]
                     self.phase = "spike5"
-            if(self.phase == "spike5"): # 跳ね5フェーズ
-                price_spike5=self.prices[day]
+            if(self.phase == "spike5"): # 跳ね5フェーズ              
                 high = self.judge_high(price=self.prices[day], baserate=[1.4,1.999], length=[1,1])
                 if((not high[0]) or (price_spike4 < price_spike5)):
                     self.types.pop("跳ね小型")
@@ -191,15 +200,75 @@ class kabu_judge(kabu_log):
                     # 減少フェーズに移行 
                     self.phase = "decreasing2"
             if(self.phase == "decreasing2"): # 2回目の減少フェーズ
-                dec = self.judge_dec(price=self.prices[day], baserate=[0.4,0.9], rate1=-0.03, rate2=[-0.02,0.0], length=[12,12])
+                dec = self.judge_dec(price=self.prices[day], baserate=[0.4,0.9], dec_rate=[-0.05,-0.03], length=[12,12])
                 if(not dec[0]):
                     self.types.pop("跳ね小型")
                     break                                                                                           
             self.pre_price = self.prices[day]
+        #print("跳ね小型："+day)
 
     # 跳ね大型
     def largespike(self):
-        pass
+        self.reset()
+        self.phase = "decreasing1"
+        for day in self.days:
+            if(self.prices[day] == 0): break
+            if(self.phase == "decreasing1"): # 1回目の減少フェーズ
+                dec = self.judge_dec(price=self.prices[day], baserate=[0.85,0.9], dec_rate=[-0.05,-0.03], length=[1,7])
+                if(not dec[0]):
+                    self.types.pop("跳ね大型")
+                    break
+                if(dec[1] is not None):
+                    # 跳ね1フェーズに移行 
+                    self.phase = "spike1"    
+            if(self.phase == "spike1"): # 跳ね1フェーズ
+                high = self.judge_high(price=self.prices[day], baserate=[0.9,1.4], length=[1,1])
+                if(not high[0]):
+                    self.types.pop("跳ね大型")
+                    break
+                if(high[1] is not None):
+                    # 跳ね2フェーズに移行 
+                    self.phase = "spike2"
+            if(self.phase == "spike2"): # 跳ね2フェーズ
+                high = self.judge_high(price=self.prices[day], baserate=[1.4,2.0], length=[1,1])
+                if(not high[0]):
+                    self.types.pop("跳ね大型")
+                    break
+                if(high[1] is not None):
+                    # 跳ね3フェーズに移行 
+                    self.phase = "spike3"                    
+            if(self.phase == "spike3"): # 跳ね3フェーズ
+                high = self.judge_high(price=self.prices[day], baserate=[2.0,6.0], length=[1,1])
+                if(not high[0]):
+                    self.types.pop("跳ね大型")
+                    break
+                if(high[1] is not None):
+                    # 跳ね4フェーズに移行 
+                    self.phase = "spike4"
+            if(self.phase == "spike4"): # 跳ね4フェーズ
+                high = self.judge_high(price=self.prices[day], baserate=[1.4,2.0], length=[1,1])
+                if(not high[0]):
+                    self.types.pop("跳ね大型")
+                    break
+                if(high[1] is not None):
+                    # 跳ね5フェーズに移行 
+                    self.phase = "spike5"
+            if(self.phase == "spike5"): # 跳ね5フェーズ
+                high = self.judge_high(price=self.prices[day], baserate=[0.9,1.4], length=[1,1])
+                if(not high[0]):
+                    self.types.pop("跳ね大型")
+                    break
+                if(high[1] is not None):
+                    # 減少フェーズに移行 
+                    self.phase = "decreasing2"
+            if(self.phase == "decreasing2"): # 2回目の減少フェーズ
+                # 減少フェーズだが例外的にjudge_high()を用いる
+                dec = self.judge_high(price=self.prices[day], baserate=[0.4,0.9], length=[12,12])
+                if(not dec[0]):
+                    self.types.pop("跳ね大型")
+                    break                                                                                           
+            self.pre_price = self.prices[day]
+        #print("跳ね大型："+day)
     
     def judge(self):
         self.fluctuating()
@@ -207,16 +276,18 @@ class kabu_judge(kabu_log):
         self.smallspike()
         self.largespike()
 
-        types_sum = 0.0
-        for p in self.types.values(): types_sum += p
+        if(self.types):    
+            types_sum = 0.0
+            for p in self.types.values(): types_sum += p
 
-        print(self.username + " : ", end='')
-        for key in self.types: 
-            self.types[key] /= types_sum
-            p = self.types[key]*100
-            print(key + f" = {p:.1f}%, ", end='')
-        print('')        
-
+            print(self.username + " : ", end='')
+            for key in self.types: 
+                self.types[key] /= types_sum
+                p = self.types[key]*100
+                print(key + f" = {p:.1f}%, ", end='')
+            print('')  
+        else:
+            print(self.username + " : 判定不能")
 
 
 
