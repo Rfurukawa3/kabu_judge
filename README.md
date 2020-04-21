@@ -20,7 +20,6 @@ python kabu_judge.py sample.csv
 
 ## 注意点
 
-* 一度データが抜けてしまうとそれ以降のデータも無視されてしまいます。
 * csvファイルの1行目と変動型の名称はsample.csvの通りにしてください。ここが変わると動きません。
 * 自島でカブ未購入の場合の特殊な仕様には未対応です。
 
@@ -31,3 +30,5 @@ python kabu_judge.py sample.csv
 <https://hyperts.net/acnh-algorithm/>
 
 <https://gist.github.com/Treeki/85be14d297c80c8b3c0a76375743325b>
+
+<https://github.com/mikebryant/ac-nh-turnip-prices/issues>
