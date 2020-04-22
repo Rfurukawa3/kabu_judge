@@ -39,20 +39,14 @@ class kabu_log:
                                       
 # kabu_logに変動型判定機能を追加したクラス
 class kabu_judge(kabu_log):
-    fluctuating_num0 = 56
-    decreasing_num0 = 1
-    smallspike_num0 = 8
-    largespike_num0 = 7
     def __init__(self,data):
         super().__init__(data)
         self.fluctuating = []
-        self.fluctuating_num = self.fluctuating_num0
         self.decreasing = []
-        self.decreasing_num = self.decreasing_num0
         self.smallspike = []
-        self.smallspike_num = self.smallspike_num0
+        self.peakpoints_s = []
         self.largespike = []
-        self.largespike_num = self.largespike_num0        
+        self.peakpoints_l = []        
         if(self.base == 0):
             self.base4gen = [90,110]
         else:
@@ -105,7 +99,7 @@ class kabu_judge(kabu_log):
                 price0 = [self.prices[self.days[i]] + self.base4gen[0]*(-0.05), self.prices[self.days[i]] + self.base4gen[1]*(-0.03)]                     
         self.decreasing.append(prices_rng)
 
-    # 跳ね小型のの許容範囲を生成
+    # 跳ね小型の許容範囲を生成
     def gen_smallspike(self):
         for decPhaseLen1 in range(8):
             prices_rng = [[0,0],[0,0],[0,0],[0,0],[0,0],[0,0],[0,0],[0,0],[0,0],[0,0],[0,0],[0,0]]
@@ -139,8 +133,9 @@ class kabu_judge(kabu_log):
                 if(self.prices[self.days[i]] == 0):    
                     price0 = [price0[0] + self.base4gen[0]*(-0.05), price0[1] + self.base4gen[1]*(-0.03)]
                 else:
-                    price0 = [self.prices[self.days[i]] + self.base4gen[0]*(-0.05), self.prices[self.days[i]] + self.base4gen[1]*(-0.03)]        
+                    price0 = [self.prices[self.days[i]] + self.base4gen[0]*(-0.05), self.prices[self.days[i]] + self.base4gen[1]*(-0.03)]
             self.smallspike.append(prices_rng)
+            self.peakpoints_s.append(self.days[decPhaseLen1+3])
     
     # 跳ね大型の許容範囲を生成
     def gen_largespike(self):
@@ -167,36 +162,63 @@ class kabu_judge(kabu_log):
             # 減少フェーズ
             for i in range(decPhaseLen1+5, 12):     
                 prices_rng[i] = [ceil(self.base4gen[0] * 0.4), ceil(self.base4gen[1] * 0.9)]
-            self.largespike.append(prices_rng)            
+            self.largespike.append(prices_rng)   
+            self.peakpoints_l.append(self.days[decPhaseLen1+2])    
 
-    # 各変動型においてあり得るパターン数を返す関数
-    def judge_each(self, pattern, pattern_num):
+    # 各変動型においてあり得るパターン数を返す関数、跳ねる型の場合ピーク位置も返す（パターン数１の場合だけ有効）
+    def judge_each(self, pattern, peakpoints=None):
         FUDGE_FACTOR = 5
-        for prices_rng in pattern:
+        pattern_num = 0
+        peakpoint = None
+        for i, prices_rng in enumerate(pattern):
             for price_rng, price in zip(prices_rng, self.prices.values()):
                 if(price == 0):
                     pass
-                elif((price < price_rng[0]-FUDGE_FACTOR) or (price > price_rng[1]+FUDGE_FACTOR)):
-                    pattern_num -= 1
+                elif((price < price_rng[0]-FUDGE_FACTOR) or (price > price_rng[1]+FUDGE_FACTOR)):              
                     break
-        return pattern_num
+            else:
+                pattern_num += 1
+                if(peakpoints is not None): peakpoint = peakpoints[i]
+        if(peakpoints is None): return pattern_num
+        else: return pattern_num, peakpoint 
 
     def judge(self):
+        # fluctuating_num0 = 56
+        # decreasing_num0 = 1
+        # smallspike_num0 = 8
+        # largespike_num0 = 7  
+
         self.gen_fluctuating()
-        self.fluctuating_num = self.judge_each(self.fluctuating, self.fluctuating_num0)
-        self.types["波型"] *= self.fluctuating_num / self.fluctuating_num0
+        fluctuating_num = self.judge_each(self.fluctuating)
+        #self.types["波型"] *= fluctuating_num / fluctuating_num0
+        if(fluctuating_num == 0): self.types["波型"] = 0
 
         self.gen_decreasing()
-        self.decreasing_num = self.judge_each(self.decreasing, self.decreasing_num0)
-        self.types["減少型"] *= self.decreasing_num / self.decreasing_num0
+        decreasing_num = self.judge_each(self.decreasing)
+        #self.types["減少型"] *= decreasing_num / decreasing_num0
+        if(decreasing_num == 0): self.types["減少型"] = 0
 
         self.gen_smallspike()
-        self.smallspike_num = self.judge_each(self.smallspike, self.smallspike_num0)
-        self.types["跳ね小型"] *= self.smallspike_num / self.smallspike_num0
+        smallspike_num, peakpoint_s = self.judge_each(self.smallspike, self.peakpoints_s)
+        #self.types["跳ね小型"] *= smallspike_num / smallspike_num0
+        if(smallspike_num == 0): self.types["跳ね小型"] = 0
 
         self.gen_largespike()
-        self.largespike_num = self.judge_each(self.largespike, self.largespike_num0)
-        self.types["跳ね大型"] *= self.largespike_num / self.largespike_num0 
+        largespike_num, peakpoint_l = self.judge_each(self.largespike, self.peakpoints_l)
+        #self.types["跳ね大型"] *= largespike_num / largespike_num0 
+        if(largespike_num == 0): self.types["跳ね大型"] = 0
+
+        if(self.types["跳ね大型"] > 0):
+            if(largespike_num == 1 and self.prices[peakpoint_l] > 0): peak = self.prices[peakpoint_l]
+            else: peak = ceil(self.base4gen[1] * 6.0)
+        elif(self.types["跳ね小型"] > 0):
+            if(smallspike_num == 1 and self.prices[peakpoint_s] > 0): peak = self.prices[peakpoint_s]
+            else: peak = ceil(self.base4gen[1] * 2.0)            
+        elif(self.types["波型"] > 0):
+            peak = ceil(self.base4gen[1] * 1.4)
+        elif(self.types["減少型"] > 0):
+            if(self.prices[self.days[0]] == 0): peak = ceil(self.base4gen[1] * 0.9)
+            else: peak = self.prices[self.days[0]]            
 
         for kabutype in ("波型", "減少型", "跳ね小型", "跳ね大型"):
             if(self.types[kabutype] <= 0): self.types.pop(kabutype)
@@ -209,12 +231,11 @@ class kabu_judge(kabu_log):
             for key in self.types: 
                 self.types[key] /= types_sum
                 p = self.types[key]*100
-                print(key + f" = {p:.1f}%, ", end='')
-            print('')  
+                #print(key + f" = {p:.1f}%, ", end='')
+                print(key + ", ", end='')
+            print("限界値=" + str(peak))
         else:
             print(self.username + " : 判定不能")
-
-
 
 if __name__ == '__main__':
     args = sys.argv
