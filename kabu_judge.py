@@ -3,12 +3,17 @@ import os
 import csv
 from math import ceil
 
+FLUCTUATING = "波型"
+DECREASING = "減少型"
+SMALLSPIKE = "跳ね小型"
+LARGESPIKE = "跳ね大型"
+
 # カブ価関連情報を保持するクラス
 class kabu_log:
     days = ('月曜AM','月曜PM','火曜AM','火曜PM','水曜AM','水曜PM','木曜AM','木曜PM','金曜AM','金曜PM','土曜AM','土曜PM')
     def __init__(self, data):
-        if(tuple(data.keys()) != ('名前', '先週', '日曜', '月曜AM','月曜PM','火曜AM','火曜PM','水曜AM','水曜PM','木曜AM','木曜PM','金曜AM','金曜PM','土曜AM','土曜PM')):
-            raise Exception("csvファイルのタイトル行が間違っています")
+        for key in ('名前', '先週', '日曜', '月曜AM','月曜PM','火曜AM','火曜PM','水曜AM','水曜PM','木曜AM','木曜PM','金曜AM','金曜PM','土曜AM','土曜PM'):
+            data.setdefault(key, '')
 
         self.username = data['名前']
         self.prices = dict()
@@ -25,16 +30,16 @@ class kabu_log:
             else:
                 self.prices[day] = int(data[day])
 
-        if(data['先週'] == "波型"):
-            self.types = {"波型" : 0.20, "減少型" : 0.15, "跳ね小型" : 0.35, "跳ね大型" : 0.30}
-        elif(data['先週'] == "減少型"):
-            self.types = {"波型" : 0.25, "減少型" : 0.05, "跳ね小型" : 0.25, "跳ね大型" : 0.45}
-        elif(data['先週'] == "跳ね小型"):
-            self.types = {"波型" : 0.45, "減少型" : 0.15, "跳ね小型" : 0.15, "跳ね大型" : 0.25}
-        elif(data['先週'] == "跳ね大型"):
-            self.types = {"波型" : 0.50, "減少型" : 0.20, "跳ね小型" : 0.25, "跳ね大型" : 0.05}
+        if(data['先週'] == FLUCTUATING):
+            self.types = {FLUCTUATING : 0.20, DECREASING : 0.15, SMALLSPIKE : 0.35, LARGESPIKE : 0.30}
+        elif(data['先週'] == DECREASING):
+            self.types = {FLUCTUATING : 0.25, DECREASING : 0.05, SMALLSPIKE : 0.25, LARGESPIKE : 0.45}
+        elif(data['先週'] == SMALLSPIKE):
+            self.types = {FLUCTUATING : 0.45, DECREASING : 0.15, SMALLSPIKE : 0.15, LARGESPIKE : 0.25}
+        elif(data['先週'] == LARGESPIKE):
+            self.types = {FLUCTUATING : 0.50, DECREASING : 0.20, SMALLSPIKE : 0.25, LARGESPIKE : 0.05}
         else:
-            self.types = {"波型" : 0.25, "減少型" : 0.25, "跳ね小型" : 0.25, "跳ね大型" : 0.25}
+            self.types = {FLUCTUATING : 0.25, DECREASING : 0.25, SMALLSPIKE : 0.25, LARGESPIKE : 0.25}
 
                                       
 # kabu_logに変動型判定機能を追加したクラス
@@ -169,6 +174,7 @@ class kabu_judge(kabu_log):
     def judge_each(self, pattern, peakpoints=None):
         FUDGE_FACTOR = 5
         pattern_num = 0
+        fudge = True # Trueかつpattern_num>0ならFUDGE_FACTORでギリギリあり得ると判定されたことを意味する
         peakpoint = None
         for i, prices_rng in enumerate(pattern):
             for price_rng, price in zip(prices_rng, self.prices.values()):
@@ -179,63 +185,70 @@ class kabu_judge(kabu_log):
             else:
                 pattern_num += 1
                 if(peakpoints is not None): peakpoint = peakpoints[i]
-        if(peakpoints is None): return pattern_num
-        else: return pattern_num, peakpoint 
+
+            if(fudge):
+                for price_rng, price in zip(prices_rng, self.prices.values()):
+                    if(price == 0):
+                        pass
+                    elif((price < price_rng[0]) or (price > price_rng[1])):              
+                        break
+                else:
+                    fudge = False
+
+        if(peakpoints is None): return pattern_num, fudge
+        else: return pattern_num, fudge, peakpoint 
 
     def judge(self):
         # fluctuating_num0 = 56
         # decreasing_num0 = 1
         # smallspike_num0 = 8
         # largespike_num0 = 7  
-
+        fudge = dict()
+        
         self.gen_fluctuating()
-        fluctuating_num = self.judge_each(self.fluctuating)
-        #self.types["波型"] *= fluctuating_num / fluctuating_num0
-        if(fluctuating_num == 0): self.types["波型"] = 0
+        fluctuating_num, fudge[FLUCTUATING] = self.judge_each(self.fluctuating)
+        if(fluctuating_num == 0): self.types[FLUCTUATING] = 0
 
         self.gen_decreasing()
-        decreasing_num = self.judge_each(self.decreasing)
-        #self.types["減少型"] *= decreasing_num / decreasing_num0
-        if(decreasing_num == 0): self.types["減少型"] = 0
+        decreasing_num, fudge[DECREASING] = self.judge_each(self.decreasing)
+        if(decreasing_num == 0): self.types[DECREASING] = 0
 
         self.gen_smallspike()
-        smallspike_num, peakpoint_s = self.judge_each(self.smallspike, self.peakpoints_s)
-        #self.types["跳ね小型"] *= smallspike_num / smallspike_num0
-        if(smallspike_num == 0): self.types["跳ね小型"] = 0
+        smallspike_num, fudge[SMALLSPIKE], peakpoint_s = self.judge_each(self.smallspike, self.peakpoints_s)
+        if(smallspike_num == 0): self.types[SMALLSPIKE] = 0
 
         self.gen_largespike()
-        largespike_num, peakpoint_l = self.judge_each(self.largespike, self.peakpoints_l)
-        #self.types["跳ね大型"] *= largespike_num / largespike_num0 
-        if(largespike_num == 0): self.types["跳ね大型"] = 0
+        largespike_num, fudge[LARGESPIKE], peakpoint_l = self.judge_each(self.largespike, self.peakpoints_l)
+        if(largespike_num == 0): self.types[LARGESPIKE] = 0
 
-        if(self.types["跳ね大型"] > 0):
+        if(self.types[LARGESPIKE] > 0):
             if(largespike_num == 1 and self.prices[peakpoint_l] > 0): peak = self.prices[peakpoint_l]
             else: peak = ceil(self.base4gen[1] * 6.0)
-        elif(self.types["跳ね小型"] > 0):
+        elif(self.types[SMALLSPIKE] > 0):
             if(smallspike_num == 1 and self.prices[peakpoint_s] > 0): peak = self.prices[peakpoint_s]
             else: peak = ceil(self.base4gen[1] * 2.0)            
-        elif(self.types["波型"] > 0):
+        elif(self.types[FLUCTUATING] > 0):
             peak = ceil(self.base4gen[1] * 1.4)
-        elif(self.types["減少型"] > 0):
+        elif(self.types[DECREASING] > 0):
             if(self.prices[self.days[0]] == 0): peak = ceil(self.base4gen[1] * 0.9)
             else: peak = self.prices[self.days[0]]            
 
-        for kabutype in ("波型", "減少型", "跳ね小型", "跳ね大型"):
+        for kabutype in (FLUCTUATING, DECREASING, SMALLSPIKE, LARGESPIKE):
             if(self.types[kabutype] <= 0): self.types.pop(kabutype)
 
+        result = ''
         if(self.types):    
-            types_sum = 0.0
-            for p in self.types.values(): types_sum += p
-
-            print(self.username + " : ", end='')
+            result += self.username + " : "
             for key in self.types: 
-                self.types[key] /= types_sum
-                p = self.types[key]*100
-                #print(key + f" = {p:.1f}%, ", end='')
-                print(key + ", ", end='')
-            print("限界値=" + str(peak))
+                if(fudge[key]):
+                    result += "(" + key + ")" + ", "
+                else:
+                    result += key + ", "
+            result += "限界値=" + str(peak)
         else:
-            print(self.username + " : 判定不能")
+            result = self.username + " : 判定不能"
+        
+        return result
 
 if __name__ == '__main__':
     args = sys.argv
@@ -253,5 +266,5 @@ if __name__ == '__main__':
             log.append(kabu_judge(row))
 
     for user in log:
-        user.judge()
+        print(user.judge())
 
