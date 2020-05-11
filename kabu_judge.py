@@ -73,9 +73,9 @@ class kabu_judge(kabu_log):
                     for i in range(hiPhaseLen1, hiPhaseLen1+decPhaseLen1):        
                         prices_rng[i] = [ceil(price0[0]), ceil(price0[1])]
                         if(self.prices[self.days[i]] == 0):    
-                            price0 = [price0[0] + self.base4gen[0]*(-0.1), price0[1] + self.base4gen[1]*(-0.04)]
+                            price0 = [price0[0] + self.base4gen[1]*(-0.1), price0[1] + self.base4gen[0]*(-0.04)]
                         else:
-                            price0 = [self.prices[self.days[i]] + self.base4gen[0]*(-0.1), self.prices[self.days[i]] + self.base4gen[1]*(-0.04)]        
+                            price0 = [self.prices[self.days[i]] + self.base4gen[1]*(-0.1), self.prices[self.days[i]] + self.base4gen[0]*(-0.04)]        
                     # 増加フェーズ
                     for i in range(hiPhaseLen1+decPhaseLen1, hiPhaseLen1+decPhaseLen1+hiPhaseLen2):
                         prices_rng[i] = [ceil(self.base4gen[0] * 0.9), ceil(self.base4gen[1] * 1.4)] 
@@ -84,9 +84,9 @@ class kabu_judge(kabu_log):
                     for i in range(hiPhaseLen1+decPhaseLen1+hiPhaseLen2, hiPhaseLen1+hiPhaseLen2+5):       
                         prices_rng[i] = [ceil(price0[0]), ceil(price0[1])]  
                         if(self.prices[self.days[i]] == 0):    
-                            price0 = [price0[0] + self.base4gen[0]*(-0.1), price0[1] + self.base4gen[1]*(-0.04)]
+                            price0 = [price0[0] + self.base4gen[1]*(-0.1), price0[1] + self.base4gen[0]*(-0.04)]
                         else:
-                            price0 = [self.prices[self.days[i]] + self.base4gen[0]*(-0.1), self.prices[self.days[i]] + self.base4gen[1]*(-0.04)]        
+                            price0 = [self.prices[self.days[i]] + self.base4gen[1]*(-0.1), self.prices[self.days[i]] + self.base4gen[0]*(-0.04)]        
                     # 増加フェーズ
                     for i in range(hiPhaseLen1+hiPhaseLen2+5, 12):
                         prices_rng[i] = [ceil(self.base4gen[0] * 0.9), ceil(self.base4gen[1] * 1.4)]   
@@ -99,9 +99,9 @@ class kabu_judge(kabu_log):
         for i in range(12):        
             prices_rng[i] = [ceil(price0[0]), ceil(price0[1])]
             if(self.prices[self.days[i]] == 0):    
-                price0 = [price0[0] + self.base4gen[0]*(-0.05), price0[1] + self.base4gen[1]*(-0.03)]
+                price0 = [price0[0] + self.base4gen[1]*(-0.05), price0[1] + self.base4gen[0]*(-0.03)]
             else:
-                price0 = [self.prices[self.days[i]] + self.base4gen[0]*(-0.05), self.prices[self.days[i]] + self.base4gen[1]*(-0.03)]                     
+                price0 = [self.prices[self.days[i]] + self.base4gen[1]*(-0.05), self.prices[self.days[i]] + self.base4gen[0]*(-0.03)]                     
         self.decreasing.append(prices_rng)
 
     # 跳ね小型の許容範囲を生成
@@ -113,9 +113,9 @@ class kabu_judge(kabu_log):
             for i in range(decPhaseLen1):     
                 prices_rng[i] = [ceil(price0[0]), ceil(price0[1])]
                 if(self.prices[self.days[i]] == 0):    
-                    price0 = [price0[0] + self.base4gen[0]*(-0.05), price0[1] + self.base4gen[1]*(-0.03)]
+                    price0 = [price0[0] + self.base4gen[1]*(-0.05), price0[1] + self.base4gen[0]*(-0.03)]
                 else:
-                    price0 = [self.prices[self.days[i]] + self.base4gen[0]*(-0.05), self.prices[self.days[i]] + self.base4gen[1]*(-0.03)]
+                    price0 = [self.prices[self.days[i]] + self.base4gen[1]*(-0.05), self.prices[self.days[i]] + self.base4gen[0]*(-0.03)]
             # 跳ね12
             for i in range(decPhaseLen1, decPhaseLen1+2):
                 prices_rng[i] = [ceil(self.base4gen[0] * 0.9), ceil(self.base4gen[1] * 1.4)] 
@@ -136,9 +136,9 @@ class kabu_judge(kabu_log):
             for i in range(decPhaseLen1+5, 12):     
                 prices_rng[i] = [ceil(price0[0]), ceil(price0[1])]
                 if(self.prices[self.days[i]] == 0):    
-                    price0 = [price0[0] + self.base4gen[0]*(-0.05), price0[1] + self.base4gen[1]*(-0.03)]
+                    price0 = [price0[0] + self.base4gen[1]*(-0.05), price0[1] + self.base4gen[0]*(-0.03)]
                 else:
-                    price0 = [self.prices[self.days[i]] + self.base4gen[0]*(-0.05), self.prices[self.days[i]] + self.base4gen[1]*(-0.03)]
+                    price0 = [self.prices[self.days[i]] + self.base4gen[1]*(-0.05), self.prices[self.days[i]] + self.base4gen[0]*(-0.03)]
             self.smallspike.append(prices_rng)
             self.peakpoints_s.append(self.days[decPhaseLen1+3])
     
@@ -151,9 +151,9 @@ class kabu_judge(kabu_log):
             for i in range(decPhaseLen1):     
                 prices_rng[i] = [ceil(price0[0]), ceil(price0[1])]
                 if(self.prices[self.days[i]] == 0):    
-                    price0 = [price0[0] + self.base4gen[0]*(-0.05), price0[1] + self.base4gen[1]*(-0.03)]
+                    price0 = [price0[0] + self.base4gen[1]*(-0.05), price0[1] + self.base4gen[0]*(-0.03)]
                 else:
-                    price0 = [self.prices[self.days[i]] + self.base4gen[0]*(-0.05), self.prices[self.days[i]] + self.base4gen[1]*(-0.03)]
+                    price0 = [self.prices[self.days[i]] + self.base4gen[1]*(-0.05), self.prices[self.days[i]] + self.base4gen[0]*(-0.03)]
             # 跳ね1
             prices_rng[decPhaseLen1] = [ceil(self.base4gen[0] * 0.9), ceil(self.base4gen[1] * 1.4)]
             # 跳ね2
